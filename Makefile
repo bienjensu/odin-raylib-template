@@ -3,8 +3,6 @@ RELEASE_DIR=out/release
 RELOAD_DIR=out/reload
 WEB_DIR=out/web
 
-ODIN_ROOT=/opt/homebrew/Cellar/odin/2024-12/libexec
-
 FILES=src/web/main_web.c $(WEB_DIR)/game.wasm.o ${ODIN_ROOT}/vendor/raylib/wasm/libraylib.a
 FLAGS=-sUSE_GLFW=3 -sASYNCIFY -sASSERTIONS -DPLATFORM_WEB --shell-file src/web/index_template.html --preload-file assets
 
