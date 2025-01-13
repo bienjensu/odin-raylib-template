@@ -1,10 +1,17 @@
 package game
 
 import "core:fmt"
+import "core:math"
 import "core:math/linalg"
 import rl "vendor:raylib"
 
-PIXEL_WINDOW_HEIGHT :: 180
+WINDOW_WIDTH :: 640
+WINDOW_HEIGHT :: 480
+
+GAME_WIDTH :: 640.
+GAME_HEIGHT :: 480.
+
+target: rl.RenderTexture
 
 Game_Memory :: struct {
 	player_pos:     rl.Vector2,
@@ -15,18 +22,15 @@ Game_Memory :: struct {
 g_mem: ^Game_Memory
 
 game_camera :: proc() -> rl.Camera2D {
-	w := f32(rl.GetScreenWidth())
-	h := f32(rl.GetScreenHeight())
-
 	return {
-		zoom = h / PIXEL_WINDOW_HEIGHT,
+		zoom = 1.0,
 		target = g_mem.player_pos,
-		offset = {w / 2, h / 2},
+		offset = {GAME_WIDTH / 2, GAME_HEIGHT / 2},
 	}
 }
 
 ui_camera :: proc() -> rl.Camera2D {
-	return {zoom = f32(rl.GetScreenHeight()) / PIXEL_WINDOW_HEIGHT}
+	return {zoom = 3.0}
 }
 
 update :: proc() {
@@ -51,16 +55,40 @@ update :: proc() {
 }
 
 draw :: proc() {
-	rl.BeginDrawing()
-	rl.ClearBackground(rl.BLACK)
-
+	rl.BeginTextureMode(target)
 	rl.BeginMode2D(game_camera())
+	rl.ClearBackground(rl.DARKGRAY)
 	rl.DrawTextureEx(g_mem.player_texture, g_mem.player_pos, 0, 1, rl.WHITE)
 	rl.DrawRectangleV({20, 20}, {10, 10}, rl.RED)
 	rl.DrawRectangleV({-30, -20}, {10, 10}, rl.GREEN)
 	rl.EndMode2D()
+	rl.EndTextureMode()
 
-	rl.BeginMode2D(ui_camera())
+	scale := math.min(
+		f32(rl.GetScreenWidth()) / f32(target.texture.width),
+		f32(rl.GetScreenHeight()) / f32(target.texture.height),
+	)
+
+	rect: rl.Rectangle = {
+		(f32(rl.GetScreenWidth()) - f32(target.texture.width) * scale) / 2,
+		(f32(rl.GetScreenHeight()) - f32(target.texture.height) * scale) / 2,
+		f32(target.texture.width) * scale,
+		f32(target.texture.height) * scale,
+	}
+
+	rl.BeginDrawing()
+	{
+		rl.ClearBackground(rl.BLACK)
+		rl.DrawTexturePro(
+			target.texture,
+			{0, 0, f32(target.texture.width), f32(-target.texture.height)},
+			rect,
+			{0, 0},
+			0,
+			rl.WHITE,
+		)
+	}
+
 
 	// NOTE: `fmt.ctprintf` uses the temp allocator. The temp allocator is
 	// cleared at the end of the frame by the main application, meaning inside
@@ -77,13 +105,12 @@ draw :: proc() {
 		rl.WHITE,
 	)
 
-	rl.EndMode2D()
-
 	rl.EndDrawing()
 }
 
 @(export)
 game_update :: proc() -> bool {
+	handle_fullscreen()
 	update()
 	draw()
 	return !rl.WindowShouldClose()
@@ -91,10 +118,12 @@ game_update :: proc() -> bool {
 
 @(export)
 game_init_window :: proc() {
-	rl.SetConfigFlags({.WINDOW_RESIZABLE, .VSYNC_HINT})
-	rl.InitWindow(1280, 720, "Odin + Raylib + Hot Reload template!")
-	rl.SetWindowPosition(200, 200)
-	rl.SetTargetFPS(500)
+	rl.SetConfigFlags({.WINDOW_TOPMOST, .WINDOW_RESIZABLE})
+	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Template")
+	rl.SetTargetFPS(300)
+
+	target = rl.LoadRenderTexture(i32(GAME_WIDTH), i32(GAME_HEIGHT))
+	rl.SetTextureFilter(target.texture, .POINT)
 }
 
 @(export)
@@ -155,4 +184,21 @@ game_force_restart :: proc() -> bool {
 // `rl.SetWindowSize` call if you don't want a resizable game.
 game_parent_window_size_changed :: proc(w, h: int) {
 	rl.SetWindowSize(i32(w), i32(h))
+}
+
+handle_fullscreen :: proc() {
+	if (rl.IsKeyDown(.LEFT_ALT) || rl.IsKeyDown(.RIGHT_ALT)) &&
+	   rl.IsKeyPressed(.ENTER) {
+		// fmt.println("Toggling fullscreen.")
+		if rl.IsWindowFullscreen() {
+			rl.ToggleBorderlessWindowed()
+			rl.SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT)
+		} else {
+			rl.SetWindowSize(
+				rl.GetMonitorWidth(rl.GetCurrentMonitor()),
+				rl.GetMonitorHeight(rl.GetCurrentMonitor()),
+			)
+			rl.ToggleBorderlessWindowed()
+		}
+	}
 }
